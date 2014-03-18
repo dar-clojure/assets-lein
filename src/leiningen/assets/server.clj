@@ -37,29 +37,32 @@
    :headers {"content-type" "text/plain; charset=UTF-8"}
    :body body})
 
-(defn send-file [f]
-  (if (.exists f)
-    {:body f}
-    (text 404 "404 Not found")))
+(defn send-exeption [ex]
+  (text 500 (str "500 Internal Server Error\n\n" (pst-str ex))))
 
 (defn base-handler [project opts]
   (fn [req]
     (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))]
       (if (= "" path)
         (text 200 "Welcome to the assets dev server!")
-        (eval-in-project (assoc project :eval-in :classloader)
-                         `(do
-                            (require '[dar.assets])
-                            (if (dar.assets/assets-edn-url ~path)
-                              (send-package ~path ~opts)
-                              (send-file (io/file (:build-dir ~opts) ~path)))))))))
+        (let [f (io/file (:build-dir opts) path)]
+          (if (and (.exists f) (not (.isDirectory f)))
+            {:body f}
+            (eval-in-project (assoc project :eval-in :classloader)
+                             `(try
+                                (require '[dar.assets])
+                                (if ((find-var 'dar.assets/assets-edn-url) ~path)
+                                  (send-package ~path ~opts)
+                                  (text 404 "404 Not Found"))
+                                (catch java.lang.Throwable ex#
+                                  (send-exeption ex#))))))))))
 
 (defn wrap-stacktrace [handler]
   (fn [req]
     (try
       (handler req)
       (catch Throwable ex
-        (text 500 (str "500 Internal Server Error\n\n" (pst-str ex)))))))
+        (send-exeption ex)))))
 
 (defn run [project opts]
   (let [handler (-> (base-handler project opts)
