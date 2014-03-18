@@ -3,9 +3,10 @@
 (defn- server
   "Start a server for building and serving assets
   during development"
-  [opts _]
+  [project opts _]
   (require '[leiningen.assets.server])
   ((find-var 'leiningen.assets.server/run)
+   project
    (merge {:build-dir "build/assets" :server-port 3000}
           opts)))
 
@@ -15,4 +16,4 @@
   ([project cmd & args]
    (let [opts (get project :assets {})]
      (case cmd
-       "server" (server opts args)))))
+       "server" (server project opts args)))))

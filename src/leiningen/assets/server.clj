@@ -1,11 +1,12 @@
 (ns leiningen.assets.server
-  (:require [dar.assets :as assets]
-            [ring.adapter.jetty :refer [run-jetty]]
+  (:require [ring.adapter.jetty :refer [run-jetty]]
+            [ring.middleware.file-info :refer [wrap-file-info]]
             [clj-stacktrace.repl :refer [pst-str]]
             [clojure.string :as string]
             [clojure.java.io :as io]
             [hiccup.core :as hiccup]
-            [hiccup.page :refer [html5]]))
+            [hiccup.page :refer [html5]]
+            [leiningen.core.eval :refer [eval-in-project]]))
 
 (defn trim-slashes [s]
   (-> s
@@ -19,6 +20,7 @@
      [:head
       [:title (or (:title pkg) (:name pkg))]
       [:style (:css build)]
+      [:script {:src "/goog/base.js"}]
       [:script (:js build)]]
      [:body
       (if-let [main (:main-ns pkg)]
@@ -26,7 +28,7 @@
 
 (defn send-package [name opts]
   (let [pkg-list (conj (get opts :include []) name)
-        build (assets/build pkg-list opts)
+        build ((find-var 'dar.assets/build) pkg-list opts)
         pkg (-> build :packages last)]
     {:body (render-package-page pkg build)}))
 
@@ -40,12 +42,17 @@
     {:body f}
     (text 404 "404 Not found")))
 
-(defn base-handler [opts]
+(defn base-handler [project opts]
   (fn [req]
     (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))]
-      (cond (= "" path) (text 200 "Welcome to the assets dev server!")
-            (assets/assets-edn-url path) (send-package path opts)
-            :else (send-file (io/file (:build-dir opts) path))))))
+      (if (= "" path)
+        (text 200 "Welcome to the assets dev server!")
+        (eval-in-project (assoc project :eval-in :classloader)
+                         `(do
+                            (require '[dar.assets])
+                            (if (dar.assets/assets-edn-url ~path)
+                              (send-package ~path ~opts)
+                              (send-file (io/file (:build-dir ~opts) ~path)))))))))
 
 (defn wrap-stacktrace [handler]
   (fn [req]
@@ -54,6 +61,8 @@
       (catch Throwable ex
         (text 500 (str "500 Internal Server Error\n\n" (pst-str ex)))))))
 
-(defn run [opts]
-  (let [handler (-> (base-handler opts) (wrap-stacktrace))]
+(defn run [project opts]
+  (let [handler (-> (base-handler project opts)
+                    (wrap-file-info)
+                    (wrap-stacktrace))]
     (run-jetty handler {:port (:server-port opts)})))
