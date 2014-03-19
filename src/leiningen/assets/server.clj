@@ -13,6 +13,11 @@
       (string/replace #"^/" "")
       (string/replace #"/$" "")))
 
+(defn render-main-html [pkg]
+  (when-let [f (:main-html pkg)]
+    (-> ((find-var 'dar.assets.utils/get-url) pkg f)
+        slurp)))
+
 (defn render-package-page [pkg build]
   (hiccup/html
    (html5
@@ -23,6 +28,7 @@
       [:script {:src "/goog/base.js"}]
       [:script (:js build)]]
      [:body
+      (render-main-html pkg)
       (if-let [main (:main-ns pkg)]
         [:script (str "goog.require('" (namespace-munge main) "');")])]])))
 
@@ -50,7 +56,7 @@
             {:body f}
             (eval-in-project (assoc project :eval-in :classloader)
                              `(try
-                                (require '[dar.assets])
+                                (require '[dar.assets] '[dar.assets.utils])
                                 (if ((find-var 'dar.assets/assets-edn-url) ~path)
                                   (send-package ~path ~opts)
                                   (text 404 "404 Not Found"))
