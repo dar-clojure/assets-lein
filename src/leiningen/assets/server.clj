@@ -33,9 +33,12 @@
         [:script (str "goog.require('" (namespace-munge main) "');")])]])))
 
 (defn send-package [name opts]
-  (let [pkg-list (conj (get opts :include []) name)
-        build ((find-var 'dar.assets/build) pkg-list opts)
-        pkg (-> build :packages last)]
+  (let [pkg ((find-var 'dar.assets/read) name)
+        pkg-list (concat (:pre-include opts)
+                         (:development pkg)
+                         [name]
+                         (:post-include opts))
+        build ((find-var 'dar.assets/build) pkg-list opts)]
     {:body (render-package-page pkg build)}))
 
 (defn text [status body]
