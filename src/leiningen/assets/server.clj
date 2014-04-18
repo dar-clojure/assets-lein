@@ -27,10 +27,11 @@
       [:style (:css build)]
       [:script {:src "/goog/base.js"}]
       [:script (:js build)]]
-     [:body
-      (render-main-html pkg)
-      (if-let [main (:main-ns pkg)]
-        [:script (str "goog.require('" (namespace-munge main) "');")])]])))
+     [:body (list
+             (render-main-html pkg)
+             (if-let [main (:main-ns pkg)]
+               (list [:script (str "goog.require('" (namespace-munge main) "')")]
+                     [:script (str (namespace-munge main) "._main()")])))]])))
 
 (defn send-package [name opts]
   (let [pkg ((find-var 'dar.assets/read) name)
