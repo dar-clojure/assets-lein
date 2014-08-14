@@ -13,9 +13,15 @@
       (string/replace #"^/" "")
       (string/replace #"/$" "")))
 
+(defmacro call [f & args]
+  `((find-var '~f) ~@args))
+
+(defmacro var* [v]
+  `(find-var '~v))
+
 (defn render-main-html [pkg]
   (when-let [f (:main-html pkg)]
-    (-> ((find-var 'dar.assets.utils/get-url) pkg f)
+    (-> (call dar.assets/resource pkg f)
         slurp)))
 
 (defn render-package-page [pkg build]
@@ -34,12 +40,18 @@
                      [:script (str (namespace-munge main) "._main()")])))]])))
 
 (defn send-package [name opts]
-  (let [pkg ((find-var 'dar.assets/read) name)
+  (let [pkg (call dar.assets/read name)
+        opts (assoc opts :main-ns (:main-ns pkg))
         pkg-list (concat (:pre-include opts)
                          (:development pkg)
                          [name]
                          (:post-include opts))
-        build ((find-var 'dar.assets/build) pkg-list opts)]
+        build (call dar.assets/build
+                [(call dar.assets.builders.copy/copy :files)
+                 (var* dar.assets.builders.css/build)
+                 (var* dar.assets.builders.cljs/build)]
+                opts
+                pkg-list)]
     {:body (render-package-page pkg build)}))
 
 (defn text [status body]
@@ -60,8 +72,13 @@
             {:body f}
             (eval-in-project (assoc project :eval-in :classloader)
                              `(try
-                                (require '[dar.assets] '[dar.assets.utils])
-                                (if ((find-var 'dar.assets/assets-edn-url) ~path)
+                                (require
+                                  '[dar.assets]
+                                  '[dar.assets.utils]
+                                  '[dar.assets.builders.copy]
+                                  '[dar.assets.builders.css]
+                                  '[dar.assets.builders.cljs])
+                                (if (call dar.assets/assets-edn-url ~path)
                                   (send-package ~path ~opts)
                                   (text 404 "404 Not Found"))
                                 (catch java.lang.Throwable ex#
