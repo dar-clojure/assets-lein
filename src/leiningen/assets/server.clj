@@ -16,43 +16,25 @@
 (defmacro call [f & args]
   `((find-var '~f) ~@args))
 
-(defmacro var* [v]
-  `(find-var '~v))
-
 (defn render-main-html [pkg]
-  (when-let [f (:main-html pkg)]
-    (-> (call dar.assets/resource pkg f)
-        slurp)))
+  (when-let [path (:main-html pkg)]
+    (slurp (call dar.assets/resource pkg path))))
 
-(defn render-package-page [pkg build]
+(defn render-package-page [{pkg :main :as build}]
   (hiccup/html
    (html5
     [:html
      [:head
       [:title (or (:title pkg) (:name pkg))]
       [:style (:css build)]
-      [:script {:src "/goog/base.js"}]
-      [:script (:js build)]]
+      [:script {:src "/goog/base.js"}]]
      [:body (list
              (render-main-html pkg)
-             (if-let [main (:main-ns pkg)]
-               (list [:script (str "goog.require('" (namespace-munge main) "')")]
-                     [:script (str (namespace-munge main) "._main()")])))]])))
+              [:script (:js build)])]])))
 
 (defn send-package [name opts]
-  (let [pkg (call dar.assets/read name)
-        opts (assoc opts :main-ns (:main-ns pkg))
-        pkg-list (concat (:pre-include opts)
-                         (:development pkg)
-                         [name]
-                         (:post-include opts))
-        build (call dar.assets/build
-                [(call dar.assets.builders.copy/copy :files)
-                 (var* dar.assets.builders.css/build)
-                 (var* dar.assets.builders.cljs/build)]
-                opts
-                pkg-list)]
-    {:body (render-package-page pkg build)}))
+  (let [build (call dar.assets.builders/dev-build name opts)]
+    {:body (render-package-page build)}))
 
 (defn text [status body]
   {:status status
@@ -74,10 +56,7 @@
                              `(try
                                 (require
                                   '[dar.assets]
-                                  '[dar.assets.utils]
-                                  '[dar.assets.builders.copy]
-                                  '[dar.assets.builders.css]
-                                  '[dar.assets.builders.cljs])
+                                  '[dar.assets.builders])
                                 (if (call dar.assets/assets-edn-url ~path)
                                   (send-package ~path ~opts)
                                   (text 404 "404 Not Found"))
