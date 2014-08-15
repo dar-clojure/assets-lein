@@ -27,10 +27,11 @@
      [:head
       [:title (or (:title pkg) (:name pkg))]
       [:style (:css build)]
-      [:script {:src "/goog/base.js"}]]
+      [:script {:src "/goog/base.js"}]
+      [:script (:js build)]]
      [:body (list
              (render-main-html pkg)
-              [:script (:js build)])]])))
+              [:script (:js-main-call build)])]])))
 
 (defn send-package [name opts]
   (let [build (call dar.assets.builders/dev-build name opts)]
