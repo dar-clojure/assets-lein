@@ -20,22 +20,28 @@
   (when-let [path (:main-html pkg)]
     (slurp (call dar.assets/resource pkg path))))
 
-(defn render-package-page [{pkg :main :as build}]
+(defn render-package-page [{pkg :main :as build} optimize?]
   (hiccup/html
    (html5
     [:html
      [:head
       [:title (or (:title pkg) (:name pkg))]
-      [:style (:css build)]
-      [:script {:src "/goog/base.js"}]
-      [:script (:js build)]]
+      [:style (:css-out build)]
+      (if-not optimize?
+        [:script {:src "/goog/base.js"}])
+      [:script (:js-out build)]
+      (if-not optimize?
+        [:script (:js-require-call build)])]
      [:body (list
-             (render-main-html pkg)
+              (render-main-html pkg)
               [:script (:js-main-call build)])]])))
 
-(defn send-package [name opts]
-  (let [build (call dar.assets.builders/dev-build name opts)]
-    {:body (render-package-page build)}))
+(defn send-package [name opts optimize?]
+  (let [build (call dar.assets.builders/development name
+                (if optimize?
+                  (call dar.assets.builders.cljs/production opts)
+                  (call dar.assets.builders.cljs/development opts)))]
+    {:body (render-package-page build optimize?)}))
 
 (defn text [status body]
   {:status status
@@ -47,7 +53,10 @@
 
 (defn base-handler [project opts]
   (fn [req]
-    (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))]
+    (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))
+          optimize? (.contains
+                      (or (:query-string req) "")
+                      "optimize")]
       (if (= "" path)
         (text 200 "Welcome to the assets dev server!")
         (let [f (io/file (:build-dir opts) path)]
@@ -57,9 +66,10 @@
                              `(try
                                 (require
                                   '[dar.assets]
-                                  '[dar.assets.builders])
+                                  '[dar.assets.builders]
+                                  '[dar.assets.builders.cljs])
                                 (if (call dar.assets/assets-edn-url ~path)
-                                  (send-package ~path ~opts)
+                                  (send-package ~path ~opts ~optimize?)
                                   (text 404 "404 Not Found"))
                                 (catch java.lang.Throwable ex#
                                   (send-exeption ex#))))))))))
