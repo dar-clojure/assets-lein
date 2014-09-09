@@ -3,12 +3,9 @@
 (defn- server
   "Start a server for building and serving assets
   during development"
-  [project opts _]
-  (require '[leiningen.assets.server])
-  ((find-var 'leiningen.assets.server/run)
-   project
-   (merge {:build-dir "build/assets" :server-port 3000}
-          opts)))
+  ([project opts _]
+   (require '[leiningen.assets.server])
+   ((find-var 'leiningen.assets.server/run) project  opts)))
 
 (defn assets
   {:help-arglists '([server])

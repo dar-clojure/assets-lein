@@ -4,62 +4,32 @@
             [clj-stacktrace.repl :refer [pst-str]]
             [clojure.string :as string]
             [clojure.java.io :as io]
-            [hiccup.core :as hiccup]
-            [hiccup.page :refer [html5]]
-            [leiningen.core.eval :refer [eval-in-project]]))
+            [leiningen.core.eval :refer [eval-in-project]]
+            [dar.assets :as assets]
+            [dar.assets.util :as util]
+            [dar.container :refer :all]))
 
-(defmacro call [f & args]
-  `((find-var '~f) ~@args))
+(application optimized)
 
-(defn render-main-html [pkg]
-  (when-let [path (:main-html pkg)]
-    (slurp (call dar.assets/resource pkg path))))
+(include assets/production)
 
-(defn render-package-page [{pkg :main :as build} optimize?]
-  (hiccup/html
-    (html5
-      [:html
-       [:head
-        [:title (or (:title pkg) (:name pkg))]
-        [:style (-> build :build :css :css)]
-        (if-not optimize?
-          [:script {:src "/goog/base.js"}])
-        [:script (-> build :build :cljs :js)]
-        (if-not optimize?
-          [:script (-> build :build :cljs :require-call)])]
-       [:body (list
-                (render-main-html pkg)
-                [:script (-> build :build :cljs :main-call)])]])))
+(define :assets/public-dir
+  :args [:assets/build-dir]
+  :fn identity)
 
-(defn option [name q]
+(define :cljs/build-dir
+  :args [:assets/public-dir]
+  :fn identity)
+
+(defn option? [name q]
   (.contains q name))
-
-(def last-cljs-options (atom nil))
-
-(defn send-package [name opts query]
-  (let [optimize? (option "optimize" query)
-        fresh? (or
-                 (option "fresh" query)
-                 (not= @last-cljs-options (:cljs opts)))]
-    (reset! last-cljs-options (:cljs opts))
-    (when fresh?
-      (call dar.assets/delete-build-dir opts)
-      (call dar.assets.builders.cljs/clear-env))
-    {:body (render-package-page
-             (call dar.assets/build
-               name
-               (find-var 'dar.assets.builders.development/build)
-               (if optimize?
-                 (call dar.assets.builders.cljs/set-production-options opts)
-                 (call dar.assets.builders.cljs/set-development-options opts)))
-             optimize?)}))
 
 (defn text [status body]
   {:status status
    :headers {"content-type" "text/plain; charset=UTF-8"}
    :body body})
 
-(defn send-exeption [ex]
+(defn send-exception [ex]
   (text 500 (str "500 Internal Server Error\n\n" (pst-str ex))))
 
 (defn trim-slashes [s]
@@ -67,35 +37,63 @@
     (string/replace #"^/" "")
     (string/replace #"/$" "")))
 
-(defn base-handler [project opts]
-  (fn [req]
-    (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))]
-      (if (= "" path)
-        (text 200 "Welcome to the assets dev server!")
-        (let [f (io/file (:build-dir opts) path)]
-          (if (and (.exists f) (not (.isDirectory f)))
-            {:body f}
-            (eval-in-project (assoc project :eval-in :classloader)
+(def options (atom nil))
+
+(def project (atom nil))
+
+(def app (atom nil))
+
+(def optimize? (atom nil))
+
+(defn reset-app [opt?]
+  (reset! app (start
+                (if opt? optimized assets/development)
+                :env
+                {:assets/build-dir (:build-dir @options)}))
+  (reset! optimize? opt?)
+  (util/rmdir (:build-dir @options)))
+
+(defn get-app [q]
+  (let [opt? (option? "optimize" q)
+        fresh? (option? "fresh" q)]
+    (when (or fresh? (not @app) (not= opt? @optimize?))
+      (reset-app opt?))
+    @app))
+
+(defn send-package [q path]
+  (<?!evaluate (start (get-app q) {:assets/main path})
+    :page))
+
+(defn handle-request [req]
+  (let [path (-> req :uri (java.net.URI.) (.getPath) (trim-slashes))
+        file (io/file (:build-dir @options) path)]
+    (cond
+      (= path "") (text 200 "Welcome to assets dev server!")
+      (and (.exists file) (not (.isDirectory file))) {:body file}
+      :else (eval-in-project @project
               `(try
-                 (require
-                   '[dar.assets]
-                   '[dar.assets.builders.development]
-                   '[dar.assets.builders.cljs])
-                 (if (call dar.assets/assets-edn-url ~path)
-                   (send-package ~path ~opts ~(or (:query-string req) ""))
+                 (if (util/assets-edn-url ~path)
+                   {:body (send-package ~(or (:query-string req) "") ~path)}
                    (text 404 "404 Not Found"))
                  (catch java.lang.Throwable ex#
-                   (send-exeption ex#))))))))))
+                   (send-exception ex#)))))))
 
 (defn wrap-stacktrace [handler]
   (fn [req]
     (try
       (handler req)
       (catch Throwable ex
-        (send-exeption ex)))))
+        (send-exception ex)))))
 
-(defn run [project opts]
-  (let [handler (-> (base-handler project opts)
-                  (wrap-file-info)
-                  (wrap-stacktrace))]
-    (run-jetty handler {:port (:server-port opts)})))
+(defn check-options [{:keys [build-dir server-port]}]
+  (when-not build-dir
+    (throw (IllegalArgumentException. ":build-dir option is not specified"))))
+
+(defn run [p opts]
+  (check-options opts)
+  (reset! project (-> p
+                    (assoc :eval-in :classloader)
+                    (update-in [:dependencies] conj '[dar/assets "0.0.1-SNAPSHOT"])))
+  (reset! options opts)
+  (run-jetty (-> handle-request wrap-file-info wrap-stacktrace)
+    {:port (or (:server-port opts) 3000)}))
