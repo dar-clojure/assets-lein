@@ -7,7 +7,8 @@
             [leiningen.core.eval :refer [eval-in-project]]
             [dar.assets :as assets]
             [dar.assets.util :as util]
-            [dar.container :refer :all]))
+            [dar.container :refer :all])
+  (:import (java.util.concurrent Executors)))
 
 (application optimized)
 
@@ -85,6 +86,12 @@
       (catch Throwable ex
         (send-exception ex)))))
 
+(def queue (Executors/newSingleThreadExecutor))
+
+(defn wrap-queue [handler]
+  (fn [req]
+    (.get (.submit queue #(handler req)))))
+
 (defn check-options [{:keys [build-dir server-port]}]
   (when-not build-dir
     (throw (IllegalArgumentException. ":build-dir option is not specified"))))
@@ -95,5 +102,5 @@
                     (assoc :eval-in :classloader)
                     (update-in [:dependencies] conj '[dar/assets "0.0.1-SNAPSHOT"])))
   (reset! options opts)
-  (run-jetty (-> handle-request wrap-file-info wrap-stacktrace)
+  (run-jetty (-> handle-request wrap-file-info wrap-stacktrace wrap-queue)
     {:port (or (:server-port opts) 3000)}))
