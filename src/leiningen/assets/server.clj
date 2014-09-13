@@ -96,7 +96,7 @@
   (when-not build-dir
     (throw (IllegalArgumentException. ":build-dir option is not specified"))))
 
-(defn run [p opts]
+(defn run [{opts :assets :as p}]
   (check-options opts)
   (reset! project (-> p
                     (assoc :eval-in :classloader)

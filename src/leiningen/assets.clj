@@ -1,16 +1,24 @@
 (ns leiningen.assets)
 
+(defmacro call [var & args]
+  `((find-var '~var) ~@args))
+
 (defn- server
   "Start a server for building and serving assets
   during development"
-  ([project opts _]
+  ([project]
    (require '[leiningen.assets.server])
-   ((find-var 'leiningen.assets.server/run) project  opts)))
+   (call leiningen.assets.server/run project)))
+
+(defn- page
+  "Build an assets component into a signle page application"
+  ([project main]
+   (require '[leiningen.assets.page])
+   (call leiningen.assets.page/build project main)))
 
 (defn assets
-  {:help-arglists '([server])
-   :subtasks [#'server]}
+  {:subtasks [#'server #'page]}
   ([project cmd & args]
-   (let [opts (get project :assets {})]
-     (case cmd
-       "server" (server project opts args)))))
+   (case cmd
+     "server" (server project)
+     "page" (page project (first args)))))
