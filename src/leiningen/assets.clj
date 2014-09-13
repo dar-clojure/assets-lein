@@ -4,8 +4,7 @@
   `((find-var '~var) ~@args))
 
 (defn- server
-  "Start a server for building and serving assets
-  during development"
+  "Start development server"
   ([project]
    (require '[leiningen.assets.server])
    (call leiningen.assets.server/run project)))

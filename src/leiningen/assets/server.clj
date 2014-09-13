@@ -94,7 +94,7 @@
 
 (defn check-options [{:keys [build-dir server-port]}]
   (when-not build-dir
-    (throw (IllegalArgumentException. ":build-dir option is not specified"))))
+    (throw (IllegalArgumentException. ":build-dir option is not specified in project.clj"))))
 
 (defn run [{opts :assets :as p}]
   (check-options opts)
