@@ -12,10 +12,11 @@ List it as a plugin in `project.clj` and specify `build-dir`
   :assets {:build-dir "build"})
 ```
 
-Unlike cljsbuild, it explicitly depends on ClojureScript compiler.
-You shouldn't add ClojureScript to your project.clj dependencies.
+Unlike [cljsbuild](https://github.com/emezeske/lein-cljsbuild),
+it explicitly depends on [ClojureScript](https://github.com/clojure/clojurescript) compiler.
+You shouldn't add ClojureScript to your `project.clj` dependencies.
 
-There are two commands available.
+There are two commands available
 
 ### page
 
