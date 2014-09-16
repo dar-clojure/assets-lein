@@ -12,7 +12,7 @@ List it as a plugin in `project.clj` and specify `build-dir`
   :assets {:build-dir "build"})
 ```
 
-Two commands are available.
+There are two commands available.
 
 ### page
 
@@ -33,10 +33,7 @@ lein assets server
 
 Starts development server. Each component is served at the corresponding
 url. For example, to view `com/example/foo` navigate to
-`http://localhost:3000/com/example/foo`.
-
-Rebuilds on each request.
-
+`http://localhost:3000/com/example/foo`. Rebuilds on each request.
 You can also append `fresh` query parameter to perform a pristine
 build, or `optimize` to optmize ClojureScript.
 
