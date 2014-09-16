@@ -100,7 +100,7 @@
   (check-options opts)
   (reset! project (-> p
                     (assoc :eval-in :classloader)
-                    (update-in [:dependencies] conj '[dar/assets "0.0.1-SNAPSHOT"])))
+                    (update-in [:dependencies] cons '[dar/assets "0.0.1"])))
   (reset! options opts)
   (run-jetty (-> handle-request wrap-file-info wrap-stacktrace wrap-queue)
     {:port (or (:server-port opts) 3000)}))
