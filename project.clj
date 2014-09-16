@@ -1,4 +1,6 @@
 (defproject dar/assets-lein "0.0.1-SNAPSHOT"
+  :description "Leiningen plugin for building assets"
+  :url "https://github.com/dar-clojure/assets-lein"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :eval-in-leiningen true
