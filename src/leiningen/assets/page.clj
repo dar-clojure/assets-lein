@@ -10,7 +10,7 @@
     (throw (IllegalArgumentException. "main component is not specified")))
   (eval-in-project (-> p
                      (assoc :eval-in :classloader)
-                     (update-in [:dependencies] cons '[dar/assets "0.0.1"]))
+                     (update-in [:dependencies] cons '[dar/assets "0.0.3"]))
     `(do
        (util/rmdir ~build-dir)
        (assets/build ~main ~build-dir))))
